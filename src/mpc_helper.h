@@ -5,7 +5,7 @@
 #include "Eigen-3.3/Eigen/Core"
 #include <cppad/cppad.hpp>
 
-namespace mpc_helper
+namespace mpc
 {
 const int LATENCY = 100;
 

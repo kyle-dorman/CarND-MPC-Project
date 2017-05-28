@@ -32,9 +32,9 @@ int main() {
   uWS::Hub h;
 
   // MPC is initialized here!
-  MPC mpc;
+  MPC mpc_solver;
 
-  h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&mpc_solver](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -77,21 +77,21 @@ int main() {
             v_x[i] = ptsx[i];
             v_y[i] = ptsy[i];
           }
-          VectorXd coeffs = mpc_helper::polyfit(v_x, v_y, 3);
+          VectorXd coeffs = mpc::polyfit(v_x, v_y, 3);
 
           // calculate crosstrack error based on fit line
-          double cte = mpc_helper::polyeval(coeffs, px) - py;
+          double cte = mpc::polyeval(coeffs, px) - py;
 
           // calculate derivative of fit line
-          VectorXd d_coeffs = mpc_helper::polyderivative(coeffs);
+          VectorXd d_coeffs = mpc::polyderivative(coeffs);
 
           // calculate the desired orientation
-          double d_psi = px * atan(mpc_helper::polyeval(d_coeffs, px));
+          double d_psi = px * atan(mpc::polyeval(d_coeffs, px));
           // calculate orientation error from fit line
           double epsi = psi - d_psi;
 
           VectorXd state(8);
-          state << px, py, psi, mpc_helper::mph_to_ms(v), cte, epsi, current_steering_angle, current_throttle;
+          state << px, py, psi, mpc::mph_to_ms(v), cte, epsi, current_steering_angle, current_throttle;
 
           /*
           * TODO: Calculate steeering angle and throttle using MPC.
@@ -99,8 +99,8 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          vector<double> result = mpc.Solve(state, coeffs);
-          double steering_angle = result[0] / mpc_helper::deg2rad(25.0);
+          vector<double> result = mpc_solver.Solve(state, coeffs);
+          double steering_angle = result[0] / mpc::deg2rad(25.0);
           double throttle_value = result[1];
 
           json msgJson;
@@ -110,11 +110,11 @@ int main() {
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory 
-          vector<double> mpc_x_vals(mpc_helper::N);
-          vector<double> mpc_y_vals(mpc_helper::N);
-          for (size_t i = 0; i < mpc_helper::N; i++) {
+          vector<double> mpc_x_vals(mpc::N);
+          vector<double> mpc_y_vals(mpc::N);
+          for (size_t i = 0; i < mpc::N; i++) {
             mpc_x_vals[i] = result[2 + i];
-            mpc_y_vals[i] = result[2 + i + mpc_helper::N];
+            mpc_y_vals[i] = result[2 + i + mpc::N];
           }
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
@@ -141,7 +141,7 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          this_thread::sleep_for(chrono::milliseconds(mpc_helper::LATENCY));
+          this_thread::sleep_for(chrono::milliseconds(mpc::LATENCY));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {

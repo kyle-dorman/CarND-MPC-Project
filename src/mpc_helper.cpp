@@ -1,5 +1,4 @@
 #include "mpc_helper.h"
-#include <vector>
 #include <math.h>
 #include "Eigen-3.3/Eigen/QR"
 #include "Eigen-3.3/Eigen/Core"
@@ -8,7 +7,7 @@
 using namespace std;
 using CppAD::AD;
 
-namespace mpc_helper
+namespace mpc
 {
 
 // Evaluate a polynomial.

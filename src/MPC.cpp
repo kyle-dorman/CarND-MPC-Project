@@ -29,13 +29,13 @@ const double ref_v = 18; // using m/s
 // variables in a singular vector. Thus, we should to establish
 // when one variable starts and another ends to make our lifes easier.
 const size_t x_start = 0;
-const size_t y_start = x_start + mpc_helper::N;
-const size_t psi_start = y_start + mpc_helper::N;
-const size_t v_start = psi_start + mpc_helper::N;
-const size_t cte_start = v_start + mpc_helper::N;
-const size_t epsi_start = cte_start + mpc_helper::N;
-const size_t delta_start = epsi_start + mpc_helper::N;
-const size_t a_start = delta_start + mpc_helper::N - 1;
+const size_t y_start = x_start + mpc::N;
+const size_t psi_start = y_start + mpc::N;
+const size_t v_start = psi_start + mpc::N;
+const size_t cte_start = v_start + mpc::N;
+const size_t epsi_start = cte_start + mpc::N;
+const size_t delta_start = epsi_start + mpc::N;
+const size_t a_start = delta_start + mpc::N - 1;
 
 class FG_eval {
  public:
@@ -64,20 +64,20 @@ class FG_eval {
     fg[0] = 0;
 
     // The part of the cost based on the reference state.
-    for (int i = 0; i < mpc_helper::N; i++) {
+    for (int i = 0; i < mpc::N; i++) {
       fg[0] += weight_cte * CppAD::pow(vars[cte_start + i] - ref_cte, 2);
       fg[0] += weight_epsi * CppAD::pow(vars[epsi_start + i] - ref_epsi, 2);
       fg[0] += weight_v * CppAD::pow(vars[v_start + i] - ref_v, 2);
     }
 
     // Minimize the use of actuators.
-    for (int i = 0; i < mpc_helper::N - 1; i++) {
+    for (int i = 0; i < mpc::N - 1; i++) {
       fg[0] += weight_delta * CppAD::pow(vars[delta_start + i], 2);
       fg[0] += weight_a * CppAD::pow(vars[a_start + i], 2);
     }
 
     // Minimize the value gap between sequential actuations.
-    for (int i = 0; i < mpc_helper::N - 2; i++) {
+    for (int i = 0; i < mpc::N - 2; i++) {
       fg[0] += weight_d_delta * CppAD::pow(vars[delta_start + i + 1] - vars[delta_start + i], 2);
       fg[0] += weight_d_a * CppAD::pow(vars[a_start + i + 1] - vars[a_start + i], 2);
     }
@@ -100,7 +100,7 @@ class FG_eval {
     fg[1 + epsi_start] = vars[epsi_start];
 
     // The rest of the constraints
-    for (int i = 0; i < mpc_helper::N - 1; i++) {
+    for (int i = 0; i < mpc::N - 1; i++) {
       // The state at time t+1 .
       AD<double> x1 = vars[x_start + i + 1];
       AD<double> y1 = vars[y_start + i + 1];
@@ -121,8 +121,8 @@ class FG_eval {
       AD<double> delta0 = vars[delta_start + i];
       AD<double> a0 = vars[a_start + i];
 
-      AD<double> f0 = mpc_helper::polyeval(coeffs, x0);
-      AD<double> psides0 = x0 * CppAD::atan(mpc_helper::polyeval(mpc_helper::polyderivative(coeffs), x0));
+      AD<double> f0 = mpc::polyeval(coeffs, x0);
+      AD<double> psides0 = x0 * CppAD::atan(mpc::polyeval(mpc::polyderivative(coeffs), x0));
 
       // Recall the equations for the model:
       // x_[t+1] = x[t] + v[t] * cos(psi[t]) * dt
@@ -131,12 +131,12 @@ class FG_eval {
       // v_[t+1] = v[t] + a[t] * dt
       // cte[t+1] = f(x[t]) - y[t] + v[t] * sin(epsi[t]) * dt
       // epsi[t+1] = psi[t] - psides[t] + v[t] * delta[t] / Lf * dt
-      fg[2 + x_start + i] = x1 - (x0 + v0 * CppAD::cos(psi0) * mpc_helper::dt);
-      fg[2 + y_start + i] = y1 - (y0 + v0 * CppAD::sin(psi0) * mpc_helper::dt);
-      fg[2 + psi_start + i] = psi1 - (psi0 + v0 * delta0 / Lf * mpc_helper::dt);
-      fg[2 + v_start + i] = v1 - (v0 + a0 * mpc_helper::dt);
-      fg[2 + cte_start + i] = cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * mpc_helper::dt));
-      fg[2 + epsi_start + i] = epsi1 - ((psi0 - psides0) + v0 * delta0 / Lf * mpc_helper::dt);
+      fg[2 + x_start + i] = x1 - (x0 + v0 * CppAD::cos(psi0) * mpc::dt);
+      fg[2 + y_start + i] = y1 - (y0 + v0 * CppAD::sin(psi0) * mpc::dt);
+      fg[2 + psi_start + i] = psi1 - (psi0 + v0 * delta0 / Lf * mpc::dt);
+      fg[2 + v_start + i] = v1 - (v0 + a0 * mpc::dt);
+      fg[2 + cte_start + i] = cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * mpc::dt));
+      fg[2 + epsi_start + i] = epsi1 - ((psi0 - psides0) + v0 * delta0 / Lf * mpc::dt);
     }
   }
 };
@@ -167,9 +167,9 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
   // element vector and there are 10 timesteps. The number of variables is:
   //
   // 4 * 10 + 2 * 9
-  size_t n_vars = 6 * mpc_helper::N + 2 * (mpc_helper::N - 1);
+  size_t n_vars = 6 * mpc::N + 2 * (mpc::N - 1);
   // TODO: Set the number of constraints
-  size_t n_constraints = mpc_helper::N * 8;
+  size_t n_constraints = mpc::N * 8;
 
   // Initial value of the independent variables.
   // SHOULD BE 0 besides initial state.
@@ -240,7 +240,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
 
   // constrain the first 100 ms / dt to be the current
   // steering angle and throttle values
-  int lag = (int)((double)mpc_helper::LATENCY / 1000 / mpc_helper::dt + 0.5);
+  int lag = (int)((double)mpc::LATENCY / 1000 / mpc::dt + 0.5);
   for (int i = 0; i < lag; i++) {
     constraints_upperbound[delta_start + i] = delta;
     constraints_lowerbound[delta_start + i] = delta;
@@ -284,12 +284,12 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
   auto cost = solution.obj_value;
   std::cout << "Cost " << cost << std::endl;
 
-  std::vector<double> result(2 + mpc_helper::N * 2);
+  std::vector<double> result(2 + mpc::N * 2);
   result[0] = solution.x[delta_start + lag];
   result[1] = solution.x[a_start + lag];
-  for (size_t i = 0; i < mpc_helper::N; i ++) {
+  for (size_t i = 0; i < mpc::N; i ++) {
     result[2 + i] = solution.x[x_start + i];
-    result[2 + i + mpc_helper::N] = solution.x[y_start + i];
+    result[2 + i + mpc::N] = solution.x[y_start + i];
   }
 
   return result;
