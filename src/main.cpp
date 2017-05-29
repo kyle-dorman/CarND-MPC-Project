@@ -40,7 +40,7 @@ int main() {
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
     string sdata = string(data).substr(0, length);
-    cout << sdata << endl;
+    // cout << sdata << endl;
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
       string s = hasData(sdata);
       if (s != "") {
@@ -54,53 +54,59 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double psi_unity = j[1]["psi_unity"];
-          double v = j[1]["speed"];
+          double v = mpc::mph_to_ms(j[1]["speed"]);
           double current_steering_angle = j[1]["steering_angle"];
           double current_throttle = j[1]["throttle"];
 
           double sin_psi = sin(psi);
           double cos_psi = cos(psi);
 
+          // pts converted to vehicle coordinate space
+          vector<double> next_x_vals(ptsx.size());
+          vector<double> next_y_vals(ptsx.size());
+
           // translate and then rotate points to vehicle space
           for (size_t i=0; i<ptsx.size(); i++) {
             double x = ptsx[i] - px;
             double y = ptsy[i] - py;
 
-            ptsx[i] = (cos_psi * x) + (sin_psi * y);
-            ptsy[i] = (-1.0 * sin_psi * x) + (cos_psi * y);
+            next_x_vals[i] = (cos_psi * x) + (sin_psi * y);
+            next_y_vals[i] = (-1.0 * sin_psi * x) + (cos_psi * y);
           }
 
           // fit a 3rd order polynomial to the points
-          Eigen::VectorXd v_x(ptsx.size());
-          Eigen::VectorXd v_y(ptsx.size());
-          for (size_t i = 0; i < ptsx.size(); i++) {
-            v_x[i] = ptsx[i];
-            v_y[i] = ptsy[i];
-          }
-          VectorXd coeffs = mpc::polyfit(v_x, v_y, 3);
+          VectorXd coeffs = mpc::polyfit(next_x_vals, next_y_vals, 3);
+
+          // project car coordinate system x, y, psi, and v into the future to account for LATENCY(100 ms)
+          VectorXd current_state(4);
+          current_state << 0, 0, 0, v;
+          mpc::updateState(current_state, current_steering_angle, current_throttle, mpc::LATENCY/1000);
+          double current_x = current_state[0];
+          double current_y = current_state[1];
+          double current_psi = current_state[2];
+          double current_v = current_state[3];
 
           // calculate crosstrack error based on fit line
-          double cte = mpc::polyeval(coeffs, px) - py;
+          double cte = mpc::polyeval(coeffs, current_x) - current_y;
 
           // calculate derivative of fit line
           VectorXd d_coeffs = mpc::polyderivative(coeffs);
 
           // calculate the desired orientation
-          double d_psi = px * atan(mpc::polyeval(d_coeffs, px));
-          // calculate orientation error from fit line
-          double epsi = psi - d_psi;
+          double d_psi = atan(mpc::polyeval(d_coeffs, current_x));
+          double epsi = current_psi - d_psi;
 
           VectorXd state(8);
-          state << px, py, psi, mpc::mph_to_ms(v), cte, epsi, current_steering_angle, current_throttle;
+          state << current_x, current_y, current_psi, current_v, cte, epsi, current_steering_angle, current_throttle;
 
           /*
-          * TODO: Calculate steeering angle and throttle using MPC.
+          * Calculate steeering angle and throttle using MPC.
           *
           * Both are in between [-1, 1].
           *
           */
           vector<double> result = mpc_solver.Solve(state, coeffs);
-          double steering_angle = result[0] / mpc::deg2rad(25.0);
+          double steering_angle = -1.0 * result[0] / mpc::deg2rad(25.0);
           double throttle_value = result[1];
 
           json msgJson;
@@ -126,12 +132,12 @@ int main() {
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
 
-          msgJson["next_x"] = ptsx;
-          msgJson["next_y"] = ptsy;
+          msgJson["next_x"] = next_x_vals;
+          msgJson["next_y"] = next_y_vals;
 
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
+          // std::cout << msg << std::endl;
           // Latency
           // The purpose is to mimic real driving conditions where
           // the car does actuate the commands instantly.

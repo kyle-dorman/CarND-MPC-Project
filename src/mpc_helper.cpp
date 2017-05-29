@@ -52,6 +52,11 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
   return result;
 }
 
+Eigen::VectorXd polyfit(std::vector<double> xvals, std::vector<double> yvals, int order)
+{
+	return polyfit(toVectorXd(xvals), toVectorXd(yvals), order);
+}
+
 // take the derivative of a simple polynomial
 Eigen::VectorXd polyderivative(Eigen::VectorXd coeffs) {
 	assert(coeffs.size() > 1);
@@ -66,5 +71,30 @@ Eigen::VectorXd polyderivative(Eigen::VectorXd coeffs) {
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
 double mph_to_ms(double x) { return x * .447; }
+
+Eigen::VectorXd toVectorXd(vector<double> &x)
+{
+	Eigen::VectorXd v(x.size());
+	for (size_t i = 0; i < x.size(); i++) {
+		v[i] = x[i];
+	}
+	return v;
+}
+
+void updateState(Eigen::VectorXd &state, double steering_angle, double throttle, double dt) {
+	double x0 = state[0];
+  double y0 = state[1];
+  double psi0 = state[2];
+  double v0 = state[3];
+
+  // x_[t+1] = x[t] + v[t] * cos(psi[t]) * dt
+  // y_[t+1] = y[t] + v[t] * sin(psi[t]) * dt
+	// psi_[t+1] = psi[t] + v[t] / Lf * delta[t] * dt
+  // v_[t+1] = v[t] + a[t] * dt
+  state[0] = x0 + v0 * cos(psi0) * dt;
+  state[1] = y0 + v0 * sin(psi0) * dt;
+  state[2] = psi0 + v0 * steering_angle * dt / Lf;
+  state[3] = v0 + throttle * dt;
+}
 
 }

@@ -7,23 +7,11 @@
 
 using CppAD::AD;
 
-// This value assumes the model presented in the classroom is used.
-//
-// It was obtained by measuring the radius formed by running the vehicle in the
-// simulator around in a circle with a constant steering angle and velocity on a
-// flat terrain.
-//
-// Lf was tuned until the the radius formed by the simulating the model
-// presented in the classroom matched the previous radius.
-//
-// This is the length from front to CoG that has a similar radius.
-const double Lf = 2.67;
-
 // Both the reference cross track and orientation errors are 0.
-// The reference velocity is set to 40 mph.
+// The reference velocity is set to 60 mph.
 const double ref_cte = 0;
 const double ref_epsi = 0;
-const double ref_v = 18; // using m/s
+const double ref_v = 26.8; // using m/s
 
 // The solver takes all the state variables and actuator
 // variables in a singular vector. Thus, we should to establish
@@ -45,19 +33,17 @@ class FG_eval {
 
   typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
   void operator()(ADvector& fg, const ADvector& vars) {
-    // TODO: implement MPC
-    // fg a vector of constraints, x is a vector of constraints.
-    // NOTE: You'll probably go back and forth between this function and
-    // the Solver function below.
+    // `fg` is a vector containing the cost and constraints.
+    // `vars` is a vector containing the variable values (state & actuators).
 
     // Set weights for all cost equations
-    double weight_cte  = 1.0;
-    double weight_epsi  = 1.0;
-    double weight_v  = 1.0;
-    double weight_delta  = 1.0;
-    double weight_a  = 1.0;
-    double weight_d_delta  = 1.0;
-    double weight_d_a  = 1.0;
+    AD<double> weight_cte  = 1.0;
+    AD<double> weight_epsi  = 100.0;
+    AD<double> weight_v  = 50.0;
+    AD<double> weight_delta  = 5000.0;
+    AD<double> weight_a  = 1.0;
+    AD<double> weight_d_delta  = 5000.0;
+    AD<double> weight_d_a  = 10.0;
 
     // The cost is stored is the first element of `fg`.
     // Any additions to the cost should be added to `fg[0]`.
@@ -122,7 +108,7 @@ class FG_eval {
       AD<double> a0 = vars[a_start + i];
 
       AD<double> f0 = mpc::polyeval(coeffs, x0);
-      AD<double> psides0 = x0 * CppAD::atan(mpc::polyeval(mpc::polyderivative(coeffs), x0));
+      AD<double> psides0 = CppAD::atan(mpc::polyeval(mpc::polyderivative(coeffs), x0));
 
       // Recall the equations for the model:
       // x_[t+1] = x[t] + v[t] * cos(psi[t]) * dt
@@ -133,10 +119,10 @@ class FG_eval {
       // epsi[t+1] = psi[t] - psides[t] + v[t] * delta[t] / Lf * dt
       fg[2 + x_start + i] = x1 - (x0 + v0 * CppAD::cos(psi0) * mpc::dt);
       fg[2 + y_start + i] = y1 - (y0 + v0 * CppAD::sin(psi0) * mpc::dt);
-      fg[2 + psi_start + i] = psi1 - (psi0 + v0 * delta0 / Lf * mpc::dt);
+      fg[2 + psi_start + i] = psi1 - (psi0 + v0 * delta0 / mpc::Lf * mpc::dt);
       fg[2 + v_start + i] = v1 - (v0 + a0 * mpc::dt);
       fg[2 + cte_start + i] = cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * mpc::dt));
-      fg[2 + epsi_start + i] = epsi1 - ((psi0 - psides0) + v0 * delta0 / Lf * mpc::dt);
+      fg[2 + epsi_start + i] = epsi1 - ((psi0 - psides0) + v0 * delta0 / mpc::Lf * mpc::dt);
     }
   }
 };
@@ -149,8 +135,6 @@ MPC::~MPC() {}
 
 vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
 {
-  bool ok = true;
-  size_t i;
   typedef CPPAD_TESTVECTOR(double) Dvector;
 
   double x = state[0];
@@ -162,14 +146,13 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
   double delta = state[6];
   double throttle = state[7];
 
-  // TODO: Set the number of model variables (includes both states and inputs).
+  // Number of model variables (includes both states and inputs).
   // For example: If the state is a 4 element vector, the actuators is a 2
   // element vector and there are 10 timesteps. The number of variables is:
-  //
   // 4 * 10 + 2 * 9
   size_t n_vars = 6 * mpc::N + 2 * (mpc::N - 1);
-  // TODO: Set the number of constraints
-  size_t n_constraints = mpc::N * 8;
+  // Number of constraints
+  size_t n_constraints = mpc::N * 6;
 
   // Initial value of the independent variables.
   // SHOULD BE 0 besides initial state.
@@ -177,7 +160,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
   for (int i = 0; i < n_vars; i++) {
     vars[i] = 0;
   }
-    // Set the initial variable values
+  
+  // Set the initial variable values
   vars[x_start] = x;
   vars[y_start] = y;
   vars[psi_start] = psi;
@@ -195,10 +179,10 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
     vars_upperbound[i] = 1.0e19;
   }
 
-  // Limit of orientation is between 0 and 2 * pi
+  // Limit of orientation is between -2pi and 2pi
   for (int i = psi_start; i < v_start; i++) {
-    vars_lowerbound[i] = 0;
-    vars_upperbound[i] = 2 * M_PI;
+    vars_lowerbound[i] = -2.0 * mpc::pi();
+    vars_upperbound[i] = 2.0 * mpc::pi();
   }
 
   // The upper and lower limits of delta are set to -25 and 25
@@ -240,13 +224,12 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
 
   // constrain the first 100 ms / dt to be the current
   // steering angle and throttle values
-  int lag = (int)((double)mpc::LATENCY / 1000 / mpc::dt + 0.5);
-  for (int i = 0; i < lag; i++) {
-    constraints_upperbound[delta_start + i] = delta;
-    constraints_lowerbound[delta_start + i] = delta;
-    constraints_upperbound[a_start + i] = throttle;
-    constraints_lowerbound[a_start + i] = throttle;
-  }
+  // for (int i = 0; i < mpc::LAG; i++) {
+  //   constraints_upperbound[delta_start + i] = delta;
+  //   constraints_lowerbound[delta_start + i] = delta;
+  //   constraints_upperbound[a_start + i] = throttle;
+  //   constraints_lowerbound[a_start + i] = throttle;
+  // }
 
   // object that computes objective and constraints
   FG_eval fg_eval(coeffs);
@@ -278,15 +261,18 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
       constraints_upperbound, fg_eval, solution);
 
   // Check some of the solution values
+  bool ok = true;
   ok &= solution.status == CppAD::ipopt::solve_result<Dvector>::success;
 
   // Cost
   auto cost = solution.obj_value;
   std::cout << "Cost " << cost << std::endl;
 
+  assert (ok == true);
+
   std::vector<double> result(2 + mpc::N * 2);
-  result[0] = solution.x[delta_start + lag];
-  result[1] = solution.x[a_start + lag];
+  result[0] = solution.x[delta_start + mpc::LAG];
+  result[1] = solution.x[a_start + mpc::LAG];
   for (size_t i = 0; i < mpc::N; i ++) {
     result[2 + i] = solution.x[x_start + i];
     result[2 + i + mpc::N] = solution.x[y_start + i];
