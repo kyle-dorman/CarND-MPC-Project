@@ -1,5 +1,12 @@
 # Writeup
 
+In this project, I created a model predictive controller (MPC) which actuates a simulator car's steering angle and throttle (acceleration & brake) given the car's current global position, speed, global orientation, current actuation values, and a best path. This solution proved more robust to handle actuation latency than a simple PID controller. In the image below, the yellow path is the desired path and the green path is the suggested path my the MPC.
+
+[//]: # (Image References)
+[image1]: ./writeup_images/turn.png "Car turning"
+
+![alt image][image1]
+
 ### The Model
 The model I used has six state variables:
 * `x` : x position in car's coordinate space (meters)
