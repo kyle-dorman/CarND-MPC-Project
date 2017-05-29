@@ -1,12 +1,10 @@
-### Writeup
+# Writeup
 
-## Implementation
-
-# The Model
+### The Model
 The model I used has six state variables:
 * `x` : x position in car's coordinate space (meters)
 * `y` : y position in car's coordinate space (meters)
-* `psi` : car orintation (radians)
+* `psi` : car orientation (radians)
 * `v` : car velocity (m/s)
 * `cte` : the cross track error (meters)
 * `epsi` : orientation error (radians)
@@ -25,7 +23,7 @@ The model has one constant:
 The model has one additional variable:
 * `d_psi` : the desired car orientation. The arctangent to the car's desired path.
 
-The model's update eqations are:
+The model's update equations are:
 * `x1 = x0 + v0 * cos(psi0) * dt`
 * `y1 = y0 + v0 * sin(psi0) * dt`
 * `psi1 = psi0 + v0 / Lf * delta * dt`
@@ -36,19 +34,19 @@ The model's update eqations are:
 * `espi0 = psi0 - d_psi`
 * `d_psi = arctan(f'(x0))`
 
-# Timestep Length & Elapsed Duration (n & dt)
-I've chosen an elapsed duration(N) of 25 because this allows the path to "see" far enough into the future to account for turns ahead while not being so large that it slows down the program. I've chosen a timestep length(dt) of 0.05 seconds. This timestep was short enough that the car didn't over correct by assuming an overly linear start and was long enough to actuate strong enough to account for the 100 ms latency. If the lag parameter changed of the top speed used (I am using 60 mph right now) changed these two hyperparameters whould have to be tuned again. 
+### Time step Length & Elapsed Duration (n & dt)
+I've chosen an elapsed duration(N) of 25 because this allows the path to "see" far enough into the future to account for turns ahead while not being so large that it slows down the program. I've chosen a time step length(dt) of 0.05 seconds. This time step was short enough that the car didn't over correct by assuming an overly linear start and was long enough to actuate strong enough to account for the 100 ms latency. If the lag parameter changed of the top speed used (I am using 60 mph right now) changed these two hyper-parameters would have to be tuned again. 
 
-# Model Predictive Control with Latency
-The project assumes a latency of 100ms. Because MPC uses a path of future points to calculate the next acctuation commands, accounting for lateny is much easier than when using a PID controller directly. In this project my steps to deal with latency were as follows:
+### Model Predictive Control with Latency
+The project assumes a latency of 100 ms. Because MPC uses a path of future points to calculate the next actuation commands, accounting for latency is much easier than when using a PID controller directly. In this project my steps to deal with latency were as follows:
 
 1. project path coordinates into vehicle coordinate space.
 2. fit a 3rd order polynomial equation to this path
-3. use the above model update equations to predict the car's x, y, psi, and v 100 ms into the future given the current acctuation commands. 
+3. use the above model update equations to predict the car's x, y, psi, and v 100 ms into the future given the current actuation commands. 
 4. Use this updated x, y, psi, and v state to calculate the cte and epsi.
 
 The other method I tried was to add additional constraints to the Ipopt solver to state the the actuations would be fixed for the first X states. This wasn't possible because I ended up having more constraints than free parameters. 
 
-# Future
+### Future
 More work could be done to increase the speed of the car and tune the error weights more. 
 
