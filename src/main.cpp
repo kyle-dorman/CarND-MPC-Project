@@ -96,8 +96,8 @@ int main() {
           double d_psi = atan(mpc::polyeval(d_coeffs, current_x));
           double epsi = current_psi - d_psi;
 
-          VectorXd state(8);
-          state << current_x, current_y, current_psi, current_v, cte, epsi, current_steering_angle, current_throttle;
+          VectorXd state(6);
+          state << current_x, current_y, current_psi, current_v, cte, epsi;
 
           /*
           * Calculate steeering angle and throttle using MPC.

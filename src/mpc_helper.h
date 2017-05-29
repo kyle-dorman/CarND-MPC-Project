@@ -9,7 +9,7 @@ namespace mpc
 {
 const int LATENCY = 100;
 
-const size_t N = 30;
+const size_t N = 25;
 const double dt = 0.05;
 
 // This value assumes the model presented in the classroom is used.

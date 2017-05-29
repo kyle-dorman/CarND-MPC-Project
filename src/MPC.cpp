@@ -143,8 +143,6 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
   double v = state[3];
   double cte = state[4];
   double epsi = state[5];
-  double delta = state[6];
-  double throttle = state[7];
 
   // Number of model variables (includes both states and inputs).
   // For example: If the state is a 4 element vector, the actuators is a 2
@@ -221,15 +219,6 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
   constraints_upperbound[v_start] = v;
   constraints_upperbound[cte_start] = cte;
   constraints_upperbound[epsi_start] = epsi;
-
-  // constrain the first 100 ms / dt to be the current
-  // steering angle and throttle values
-  // for (int i = 0; i < mpc::LAG; i++) {
-  //   constraints_upperbound[delta_start + i] = delta;
-  //   constraints_lowerbound[delta_start + i] = delta;
-  //   constraints_upperbound[a_start + i] = throttle;
-  //   constraints_lowerbound[a_start + i] = throttle;
-  // }
 
   // object that computes objective and constraints
   FG_eval fg_eval(coeffs);
